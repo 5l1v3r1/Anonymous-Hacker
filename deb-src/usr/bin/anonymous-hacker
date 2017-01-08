@@ -1,0 +1,393 @@
+#!/bin/bash
+
+#===============================================================================
+#
+#          FILE:  anonymous-hacker
+#
+#         USAGE:  anonymous start|stop|status
+#
+#   DESCRIPTION:  Anonymous start, stop, status.
+# 	Copyright (C) 2016 Teeknofil
+#       OPTIONS:  ---
+#  REQUIREMENTS:  ---
+#          BUGS:  ---
+#         NOTES:  Contact teeknofil.dev@gmail.com for bug.
+#        AUTHOR:  Teeknofil
+#       COMPANY:  Anonymous freelance.
+#       VERSION:  1.1
+#       CREATED:  26/10/2016 23:42:31 CEST
+#      REVISION:  ---
+#===============================================================================
+
+BOLD="\033[01;01m" # Higligh
+BLUE='\033[1;94m'
+GREEN='\e[0;32m'   # Success
+YELLOW='\e[01;33m' # Warning/Information 
+RED='\033[1;91m'   # Error
+RESET="\033[00m"   # Normal
+
+ColorEcho()
+{
+  echo -e "${1}${2}$RESET"  
+}
+
+OK=$(ColorEcho $GREEN "[ OK ]")
+TASK=$(ColorEcho $GREEN "[+]")
+
+# List, separated by spaces, of process names that should be killed
+TO_KILL="chrome chromium transmission dropbox iceweasel icedove firefox firefox-esr pidgin pidgin.orig skype deluge thunderbird xchat"
+
+# List, separated by spaces, of BleachBit cleaners
+
+BLEACHBIT_CLEANERS="bash.history system.cache system.clipboard system.custom system.recent_documents system.rotated_logs system.tmp system.trash adobe_reader.cache chromium.cache chromium.current_session chromium.history elinks.history emesene.cache epiphany.cache firefox.url_history flash.cache flash.cookies google_chrome.cache google_chrome.history  links2.history opera.cache opera.search_history opera.url_history"
+
+# Overwrite files to hide contents
+OVERWRITE="true"
+
+# The default local hostname
+REAL_HOSTNAME="linux"
+
+
+#Anonymous Hacker Proxy" >> /root/.bashrc
+ftp_proxy = "ftp_proxy=\"127.0.0.1:9050\"" 
+http_proxy = "http_proxy=\"127.0.0.1:9050\""
+https_proxy = "https_proxy=\"127.0.0.1:9050\""
+socks_proxy  ="socks_proxy =\"127.0.0.1:9050\""
+
+
+RunIptablesForTor()
+{
+	if [ -f /etc/default/toriptables ] ; then
+		/bin/bash /etc/default/toriptables
+	fi
+
+	service tor restart
+}
+
+
+Warning() {
+	echo -e " $GREEN[$RED!$GREEN]$RESET Warning ! \n"
+	echo " This script simply avoids the most common data leakage in the system."
+	echo " What you are doing is allowing you to remain anonymous"
+	echo " Do not do stupid things".
+	echo
+	echo -e "  $GREEN[$RED!$GREEN]$RESET Edit /etc/default/toriptables for your firewall ! ! ! \n"
+}
+
+# General-purpose Yes/No prompt function
+Ask() {
+	while true; do
+		if [ "${2:-}" = "Y" ]; then
+			prompt="Y/n"
+			default=Y
+		elif [ "${2:-}" = "N" ]; then
+			prompt="y/N"
+			default=N
+		else
+			prompt="y/n"
+			default=
+		fi
+
+		# Ask the question
+		echo
+		read -p "$1 [$prompt] > " REPLY
+
+		# Default?
+		if [ -z "$REPLY" ]; then
+			REPLY=$default
+		fi
+
+		# Check if the reply is valid
+		case "$REPLY" in
+			Y*|y*) return 0 ;;
+			N*|n*) return 1 ;;
+		esac
+	done
+}
+
+# Make sure that only root can run this script
+CheckRoot()
+{
+	if [ $(id -u) -ne 0 ]; then
+		echo -e "$GREEN[$RED!$GREEN]$RESET This script must be run as root!" >&2
+		exit 1
+	fi
+}
+
+# Kill processes at startup
+KillProcess() 
+{
+	if [ "$TO_KILL" != "" ]; then
+		killall -q $TO_KILL
+		echo -e " $GREEN*$RESET Killing processes can be dangerous"
+	fi
+}
+
+# Release DHCP address
+CleanDHCP() 
+{
+	dhclient -r
+	rm -f /var/lib/dhcp/dhclient*
+	echo -e " $GREEN*$RESET We release the DHCP address"
+}
+
+# Change the local hostname
+ChangeHostname() 
+{
+
+	echo
+
+	CURRENT_HOSTNAME=$(hostname)
+
+	#CleanDHCP
+
+	RANDOM_HOSTNAME=$(shuf -n 1 /etc/dictionaries-common/words | sed -r 's/[^a-zA-Z]//g' | awk '{print tolower($0)}')
+
+	NEW_HOSTNAME=${1:-$RANDOM_HOSTNAME}
+
+	echo $NEW_HOSTNAME > /etc/hostname
+	sed -i 's/127.0.0.1.*/127.0.0.1\t'$NEW_HOSTNAME'/g' /etc/hosts
+
+	echo -e " $GREEN*$RESET Change the hostname to $NEW_HOSTNAME"
+}
+
+# Change the MAC address for network interfaces
+ChangeMac() 
+{
+
+
+	echo -e "Select network interfaces : "
+	read IFACE
+
+
+	ifconfig  $IFACE down
+
+	if [ "$1" = "permanent" ]; then
+
+		NEW_MAC=$(macchanger -p "$IFACE" )
+		echo "$NEW_MAC"
+	else
+		NEW_MAC=$(macchanger -A "$IFACE" )
+		echo "$NEW_MAC"
+	fi
+
+	ifconfig $IFACE up
+	dhclient
+	
+}
+
+IptablesFlush()
+ {
+	if [ -f /usr/bin/iptables-flush ] ; then
+		/bin/bash /usr/bin/iptables-flush
+	fi
+}
+
+# Implementation of Transparently Routing Traffic Through Tor
+# https://trac.torproject.org/projects/tor/wiki/doc/TransparentProxy
+RedirectToTor() 
+{	
+
+	if [ ! -e /var/run/tor/tor.pid ]; then
+		service tor start;		
+	fi
+
+	if ! [ -f /etc/network/iptables.rules ]; then
+		iptables-save > /etc/network/iptables.rules
+		echo  -e " $GREEN*$RESET iptables rules saved"
+	fi
+
+
+	IptablesFlush	
+	RunIptablesForTor	
+	
+
+	#Anonymous Hacker Proxy" >> /root/.bashrc
+	export ftp_proxy  
+	export http_proxy
+	export https_proxy
+	export socks_proxy 
+}
+
+# BleachBit cleaners deletes unnecessary files to preserve privacy
+
+DoBleachbit() 
+{
+	if [ "$OVERWRITE" = "true" ] ; then
+		echo -e " $GREEN*$RESET Deleting unnecessary files ... "
+		bleachbit -o -c $BLEACHBIT_CLEANERS >/dev/null
+	else
+		echo -e " $GREEN*$RESET Deleting unnecessary files ... "
+		bleachbit -c $BLEACHBIT_CLEANERS >/dev/null
+	fi
+
+	echo "Done!"
+}
+
+
+DoStart()
+{
+
+	CheckRoot
+	Warning
+
+	echo -e " $GREEN[$BLUE i$GREEN ]$RESET  Starting mode Anonymous"
+
+	#Kill IPv6 services
+	echo -e " $GREEN[$BLUE i$GREEN ]$RESET Stopping IPv6 services \n"
+	# add lines to sysctl.conf that will kill ipv6 services
+	echo "net.ipv6.conf.all.disable_ipv6 = 1 " >> /etc/sysctl.conf
+	echo "net.ipv6.conf.default.disable_ipv6=1 " >> /etc/sysctl.conf
+	sysctl -p > /dev/null  # have sysctl reread /etc/sysctl.conf
+
+
+	
+	if ! [ -f /etc/network/iptables.rules ]; then
+		iptables-save > /etc/network/iptables.rules
+		echo -e " $GREEN*$BLUE Saved iptables rules$RESET\n"
+	fi
+	
+	KillProcess
+
+
+	if [ "$(virt-what)" != "" ]; then
+		echo " $GREEN*$RESET Unable to change MAC address in a Virtual Machine"
+	else
+		if Ask "Do you want to change the MAC address?" Y; then
+			ChangeMac
+		fi
+	fi
+
+
+	if Ask "Do you want to change the local hostname?" Y; then
+		read -p "Type it or press Enter for a random one > " CHOICE
+
+		if [ "$CHOICE" = "" ]; then
+			ChangeHostname
+		else
+			ChangeHostname "$CHOICE"
+		fi
+	fi
+
+
+	if Ask "You want to make a transparent routing traffic through Tor?" Y; then
+		RedirectToTor	
+	fi
+
+	echo -e "$TASK  All traffic was redirected throught Tor 	: $OK\n"
+
+}
+
+
+DoStop()
+{
+
+	CheckRoot
+
+	echo -e "\n $GREEN[$BLUE i$GREEN ]$RESET Stopping service Anonymous"
+	service tor stop
+
+	IptablesFlush
+	
+	if [ -f /etc/network/iptables.rules ]; then
+		iptables-restore < /etc/network/iptables.rules
+		rm /etc/network/iptables.rules
+		echo -e " $GREEN*$RESET Iptables rules restored"
+	fi
+
+
+	KillProcess
+	
+	if [ "$(virt-what)" != "" ]; then
+		echo " $GREEN*$RESET We can not change the MAC address on a virtual machine"
+	else
+		if Ask "You want to change your MAC address?" Y; then
+			ChangeMac permanent
+		fi
+	fi
+
+	if Ask "You want to change your local hostname?" Y; then
+		read -p "Write it, or press Enter to use [$REAL_HOSTNAME] > " CHOICE
+
+		if [ "$CHOICE" = "" ]; then
+			ChangeHostname $REAL_HOSTNAME
+		else
+			ChangeHostname $CHOICE
+		fi
+	else
+		echo
+	fi
+
+	unset ftp_proxy  
+	unset http_proxy
+	unset https_proxy
+	unset socks_proxy 
+	
+	echo -e " $GREEN*$RESET Anonymous mode stopped\n"
+
+	if [ "$DISPLAY" ]; then
+		if Ask "Delete unnecessary files to preserve your privacy?" Y; then
+			DoBleachbit
+		fi
+	fi
+
+	#sed -i 's/export ftp_proxy=/#export ftp_proxy=/g' /root/.bashrc
+	#sed -i 's/export http_proxy=/#export http_proxy=/g' /root/.bashrc
+	#sed -i 's/export https_proxy=/#export https_proxy=/g' /root/.bashrc
+	#sed -i 's/export socks_proxy=/#export socks_proxy=/g' /root/.bashrc
+	#sed -i 's/Acquire/#Acquire/g' /etc/apt/apt.conf.d/apt.conf
+	echo
+}
+
+DoStatus() 
+{
+
+	echo "[i] Showing status Anonymous"
+	echo
+
+	ifconfig -a | grep "encap:Ethernet" | awk '{print " * " $1, $5}'
+
+	CURRENT_HOSTNAME=$(hostname)
+	echo -e " $GREEN*$RESET Hostname $CURRENT_HOSTNAME"
+
+	HTML=$(curl -s https://check.torproject.org/?lang=en_US)
+	IP=$(echo $HTML | egrep -m1 -o '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
+
+	echo $HTML | grep -q "Congratulations. This browser is configured to use Tor."
+
+	if [ $? -ne 0 ]; then
+		echo -e " $GREEN*$RESET IP $IP"
+		echo -e " $GREEN*$RESET Tor OFF"
+		exit 3
+	else
+		echo  -e " $GREEN*$RESET IP $IP"
+		echo -e " $GREEN*$RESET Tor ON"
+	fi
+
+	service tor status
+}
+
+
+################################# 
+#                               #
+#     Main                      #
+#                               # 
+#################################
+
+case "$1" in
+	start)
+		DoStart
+	;;
+	stop)
+		DoStop
+	;;
+	status)
+		DoStatus
+	;;
+	*)
+		echo "Usage: $0 {start|stop|status}" >&2
+		exit 3
+	;;
+esac
+
+exit 0
