@@ -6,8 +6,8 @@ Anonymous OS Linux with tor
 <pre>
 $ git clone https://github.com/teeknofil/Anonymous-Hacker.git
 $ cd Anonymous-Hacker
-$ chmod +x install.sh
-$ ./install.sh
+$ chmod +x setup.sh
+$ ./setup.sh
 </pre>
 
 # How run 
@@ -32,4 +32,4 @@ $ sudo anonymous-hacker status
 setup manualy noip.
 
 # Warning
-Edit the files so that your hostname is correct in files anonymous-hacker !! By default the hostname in kali.
+Edit the files so that your hostname is correct in files anonymous-hacker !! By default the hostname in linux.
